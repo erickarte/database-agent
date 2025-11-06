@@ -1,0 +1,18 @@
+{
+  "project_name": "E-commerce Platform",
+  "project_description": "Plataforma de e-commerce com alta escalabilidade",
+  "requirements": {
+    "data_type": "mixed",
+    "scalability": "high",
+    "consistency": "strong",
+    "high_read_throughput": true,
+    "data_volume": "large",
+    "high_availability": true,
+    "real_time_analytics": true
+  },
+  "constraints": {
+    "budget": "medium",
+    "team_expertise": ["JavaScript", "Python"],
+    "time_to_market": "3 months"
+  }
+}
