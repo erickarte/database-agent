@@ -1,7 +1,10 @@
+from dotenv import load_dotenv
+load_dotenv()
 from flask import Flask, request, jsonify
 import logging
 import json
 from typing import Dict, Any, List
+from provider import DatabaseProvider, DatabasePatterns, AIDatabaseAdvisor
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -90,7 +93,11 @@ def analyze_database():
         if not provider.validate_project_data(data):
             return jsonify({"success": False, "error": "Dados do projeto inválidos"}), 400
         
-        # Gerar recomendações
+        # 🔥 NOVO: Obter recomendação de IA
+        ai_advisor = AIDatabaseAdvisor()
+        ai_recommendation = ai_advisor.get_ai_recommendation(data)
+        
+        # Gerar recomendações tradicionais
         recommendations = _generate_database_recommendations(data)
         
         # Gerar sugestões de arquitetura
@@ -108,6 +115,7 @@ def analyze_database():
             "architecture_suggestions": architecture_suggestions,
             "data_flow": data_flow,
             "considerations": considerations,
+            "ai_analysis": ai_recommendation,  # 🔥 NOVO campo
             "agent_type": "database_agent"
         }
         
