@@ -1,10 +1,12 @@
-from dotenv import load_dotenv
-load_dotenv()
 from flask import Flask, request, jsonify
 import logging
 import json
 from typing import Dict, Any, List
+from dotenv import load_dotenv
 from provider import DatabaseProvider, DatabasePatterns, AIDatabaseAdvisor
+
+# Carregar variáveis de ambiente
+load_dotenv()
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)

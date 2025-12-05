@@ -1,7 +1,7 @@
 import requests
 import logging
 from typing import Dict, Any
-import google.generativeai as genai
+import openai
 import os
 import json
 
@@ -78,49 +78,134 @@ class DatabasePatterns:
 
 class AIDatabaseAdvisor:
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.use_real_ai = False
-        self.real_ai_model = None
+        # DEBUG: Mostrar o que está acontecendo
+        print(f"\n🔍 DEBUG AIDatabaseAdvisor.__init__()")
+        print(f"   api_key passada: {'✅ SIM' if api_key else '❌ NÃO'}")
         
-        # Tentar configurar IA real se tiver chave
+        # Carregar do .env se não foi passada
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        print(f"   self.api_key final: {'✅ SIM (tem chave)' if self.api_key else '❌ NÃO (sem chave)'}")
+        
+        if self.api_key:
+            print(f"   Comprimento da chave: {len(self.api_key)} caracteres")
+            # Mostrar início e fim (mascarado)
+            if len(self.api_key) > 8:
+                print(f"   Chave (mascarada): {self.api_key[:8]}...{self.api_key[-4:]}")
+        
+        self.use_real_ai = False
+        
+        # Tentar configurar OpenAI se tiver chave
         if self.api_key:
             try:
-                genai.configure(api_key=self.api_key)
-                self.real_ai_model = genai.GenerativeModel('models/gemini-2.0-flash-001')
+                print("   🚀 Tentando configurar OpenAI...")
+                openai.api_key = self.api_key
+                # Testar a conexão com uma requisição simples
+                self._test_openai_connection()
                 self.use_real_ai = True
-                print("✅ IA Real (Gemini) configurada com sucesso!")
+                print("   ✅ OpenAI GPT-4o Mini configurado com sucesso!")
             except Exception as e:
-                print(f"⚠️  IA Real não disponível: {e}. Usando modo simulação.")
+                print(f"   ⚠️  OpenAI não disponível: {e}")
+                self.use_real_ai = False
         else:
-            print("✅ Modo simulação ativado (configure GEMINI_API_KEY para IA real)")
+            print("   ✅ Modo simulação ativado (sem chave OpenAI)")
+    
+    def _test_openai_connection(self):
+        """Testa a conexão com a OpenAI"""
+        try:
+            print("   🧪 Testando conexão com OpenAI...")
+            # Requisição de teste leve
+            test_response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": "Test"}],
+                max_tokens=5
+            )
+            print(f"   ✅ Conexão OpenAI OK: {test_response.choices[0].message.content}")
+            # ⚠️ NÃO retorne nada aqui
+        except openai.AuthenticationError as e:
+            print(f"   ❌ Erro de autenticação OpenAI: {e}")
+            raise Exception(f"Falha na autenticação: {e}")
+        except Exception as e:
+            print(f"   ❌ Outro erro OpenAI: {e}")
+            raise Exception(f"Falha ao conectar com OpenAI: {e}")
     
     def get_ai_recommendation(self, project_data: Dict[str, Any]) -> str:
-        """Fornece análise de IA - real se disponível, simulada caso contrário"""
+        """Fornece análise de IA - OpenAI se disponível, simulada caso contrário"""
         
-        if self.use_real_ai and self.real_ai_model:
-            return self._get_real_ai_recommendation(project_data)
+        if self.use_real_ai:
+            return self._get_openai_recommendation(project_data)
         else:
             return self._get_simulated_ai_recommendation(project_data)
     
-    def _get_real_ai_recommendation(self, project_data: Dict[str, Any]) -> str:
-        """Usa Gemini API para análise real"""
+    def _get_openai_recommendation(self, project_data: Dict[str, Any]) -> str:
+        """Usa OpenAI GPT-4o Mini para análise real"""
+        
         try:
             prompt = f"""
-            Como arquiteto de banco de dados sênior, analise:
+            Como arquiteto de banco de dados sênior com 15 anos de experiência, analise este projeto em detalhes:
 
-            PROJETO: {project_data.get('project_name')}
-            DESCRIÇÃO: {project_data.get('project_description')}
-            REQUISITOS: {json.dumps(project_data.get('requirements', {}), indent=2)}
+            **PROJETO**: {project_data.get('project_name', 'Não especificado')}
+            **DESCRIÇÃO**: {project_data.get('project_description', 'Não fornecida')}
+            **REQUISITOS TÉCNICOS**: {json.dumps(project_data.get('requirements', {}), indent=2)}
 
-            Forneça recomendações técnicas detalhadas sobre arquitetura de banco de dados.
+            Forneça uma análise técnica completa e acionável cobrindo:
+
+            ## 1. ARQUITETURA RECOMENDADA
+            - Abordagem principal (Relacional, NoSQL, Híbrida, Poliglota)
+            - Justificativa técnica para a escolha
+
+            ## 2. TECNOLOGIAS ESPECÍFICAS  
+            - Bancos de dados recomendados (com versões específicas se aplicável)
+            - Ferramentas complementares (cache, ORM, migrações)
+
+            ## 3. PADRÕES ARQUITETURAIS
+            - Padrões de design a implementar
+            - Estratégia de replicação e sharding
+            - Considerações de consistência
+
+            ## 4. PLANO DE ESCALABILIDADE
+            - Como escalar verticalmente e horizontalmente
+            - Pontos de atenção em alto volume
+            - Estratégia de backup e recovery
+
+            ## 5. ANÁLISE DE RISCOS
+            - Possíveis problemas e mitigação
+            - Custos envolvidos
+            - Curva de aprendizado da equipe
+
+            Seja extremamente técnico, prático e específico. Inclua nomes de tecnologias concretas.
+            Formate a resposta de forma clara com tópicos e bullet points.
             """
             
-            response = self.real_ai_model.generate_content(prompt)
-            return f"🤖 ANÁLISE GEMINI AI:\n\n{response.text}"
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": "Você é um arquiteto de banco de dados sênior especializado em recomendações técnicas. Seja detalhado, específico e prático."
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=2000,
+                temperature=0.7,
+                top_p=0.9
+            )
             
+            analysis = response.choices[0].message.content
+            return f"🤖 ANÁLISE OPENAI GPT-4o MINI:\n\n{analysis}"
+        
+        except openai.AuthenticationError:
+            error_msg = "❌ Erro de autenticação OpenAI. Verifique sua API_KEY no arquivo .env"
+            print(error_msg)
+            return f"{error_msg}\n\nUsando modo simulação:\n{self._get_simulated_ai_recommendation(project_data)}"
+        
+        except openai.RateLimitError:
+            error_msg = "⚠️  Limite de taxa excedido na OpenAI. Usando modo simulação."
+            print(error_msg)
+            return self._get_simulated_ai_recommendation(project_data)
+        
         except Exception as e:
-            # Se der erro na IA real, cai para simulação
-            print(f"❌ Erro na IA real: {e}. Usando simulação.")
+            error_msg = f"❌ Erro na OpenAI: {str(e)[:100]}... Usando modo simulação."
+            print(error_msg)
             return self._get_simulated_ai_recommendation(project_data)
     
     def _get_simulated_ai_recommendation(self, project_data: Dict[str, Any]) -> str:
@@ -133,7 +218,7 @@ class AIDatabaseAdvisor:
         recommendations = self._analyze_requirements(req)
         
         return f"""
-🤖 ANÁLISE DE ARQUITETURA DE BANCO DE DADOS
+🤖 ANÁLISE DE ARQUITETURA DE BANCO DE DADOS (MODO SIMULAÇÃO)
 
 📊 PROJETO: {project_name}
 📝 DESCRIÇÃO: {project_data.get('project_description', 'Não fornecida')}
@@ -157,7 +242,7 @@ class AIDatabaseAdvisor:
 {recommendations['next_steps']}
 
 ---
-🔧 MODO: Simulação (Configure GEMINI_API_KEY para análise com IA real)
+🔧 MODO: Simulação (Configure OPENAI_API_KEY no arquivo .env para análise com IA real)
 """
     
     def _analyze_requirements(self, requirements: Dict[str, Any]) -> Dict[str, str]:
@@ -171,62 +256,87 @@ class AIDatabaseAdvisor:
         write_throughput = requirements.get('high_write_throughput', False)
         real_time = requirements.get('real_time', False)
         data_volume = requirements.get('data_volume', 'small')
+        high_availability = requirements.get('high_availability', False)
         
         # Determinar arquitetura principal
         if data_type == 'structured' and consistency == 'strong':
-            primary_db = "PostgreSQL"
-            primary_reason = "Dados estruturados com necessidade de transações ACID"
+            primary_db = "PostgreSQL 15+"
+            primary_reason = "Dados estruturados com necessidade de transações ACID e consistência forte"
         elif data_type == 'document':
-            primary_db = "MongoDB" 
-            primary_reason = "Dados semi-estruturados com flexibilidade de schema"
+            primary_db = "MongoDB 7.0+"
+            primary_reason = "Dados semi-estruturados com flexibilidade de schema e alta escalabilidade"
         elif real_time and read_throughput:
             primary_db = "PostgreSQL + Redis"
-            primary_reason = "Combinação de consistência forte com performance em tempo real"
+            primary_reason = "Combinação de consistência forte (PostgreSQL) com performance em tempo real (Redis)"
+        elif data_volume == 'massive' and write_throughput:
+            primary_db = "Cassandra ou ScyllaDB"
+            primary_reason = "Otimizado para escrita massiva e alta disponibilidade"
         else:
             primary_db = "PostgreSQL"
-            primary_reason = "Banco versátil para maioria dos casos de uso"
+            primary_reason = "Banco versátil e robusto para maioria dos casos de uso"
         
         # Estratégia de cache
-        cache_strategy = "Redis para cache e sessões" if read_throughput else "Cache em aplicação"
+        if read_throughput:
+            cache_strategy = "Redis Cluster para cache distribuído e sessões"
+        elif real_time:
+            cache_strategy = "Redis para cache em memória com pub/sub"
+        else:
+            cache_strategy = "Cache em aplicação com expiração controlada"
         
         # Estratégia de escalabilidade
-        if scalability == 'high':
-            scale_strategy = "Sharding horizontal + Replicação de leitura"
-        elif scalability == 'very_high':
-            scale_strategy = "Arquitetura multi-região com failover automático"
+        if scalability == 'very_high':
+            scale_strategy = "Arquitetura multi-região com sharding automático e failover"
+        elif scalability == 'high':
+            scale_strategy = "Sharding horizontal + Read replicas + Load balancing"
+        elif high_availability:
+            scale_strategy = "Replicação síncrona com auto-failover"
         else:
-            scale_strategy = "Replicação síncrona para alta disponibilidade"
+            scale_strategy = "Replicação assíncrona para backup e recuperação"
+        
+        # Estratégia de backup
+        if data_volume in ['large', 'massive']:
+            backup_strategy = "Backup incremental + Snapshots + Replicação cross-region"
+        elif high_availability:
+            backup_strategy = "Backup contínuo com ponto de recuperação (PITR)"
+        else:
+            backup_strategy = "Backup diário completo + logs de transação"
         
         return {
-            'primary': f"{primary_db} - {primary_reason}",
+            'primary': f"{primary_db}\n📋 {primary_reason}",
             'architecture': f"""
 • Banco Primário: {primary_db}
 • Cache: {cache_strategy}
-• Replicação: {'Ativa' if requirements.get('high_availability') else 'Opcional'}
-• Backup: Estratégia automática com retenção de 30 dias
+• Replicação: {'Ativa com auto-failover' if high_availability else 'Opcional'}
+• Backup: {backup_strategy}
+• Monitoramento: Prometheus + Grafana para métricas em tempo real
             """,
             'performance': f"""
-• Leitura: {'Cache distribuído + Read replicas' if read_throughput else 'Otimizações de query'}
-• Escrita: {'Write-ahead logging + Batch operations' if write_throughput else 'Transações otimizadas'}
-• Latência: {'Sub-milisegundo com cache' if real_time else 'Otimizações padrão'}
+• Leitura: {'Cache distribuído + Read replicas + Query optimization' if read_throughput else 'Indexação adequada + Query tuning'}
+• Escrita: {'Batch operations + Async processing' if write_throughput else 'Transações otimizadas'}
+• Latência: {'Sub-milisegundo com cache Redis' if real_time else 'Otimizações padrão (<100ms)'}
+• Throughput: {'Horizontal scaling' if scalability in ['high', 'very_high'] else 'Vertical scaling'}
             """,
             'security': """
-• Criptografia: Dados em repouso e em trânsito
-• Autenticação: Mecanismo nativo do banco
-• Audit: Log de todas as operações sensíveis
-• Backup: Criptografado e off-site
+• Criptografia: AES-256 em repouso, TLS 1.3 em trânsito
+• Autenticação: JWT + OAuth2 + MFA (Multi-Factor Authentication)
+• Autorização: RBAC (Role-Based Access Control) granular
+• Audit: Log completo de todas as operações com retenção de 1 ano
+• Compliance: GDPR, LGPD, HIPAA (conforme necessário)
             """,
             'scalability': f"""
 • Estratégia: {scale_strategy}
-• Monitoramento: Métricas em tempo real
-• Auto-scaling: {'Configurado' if scalability in ['high', 'very_high'] else 'Manual'}
-• Particionamento: {'Por data/região' if data_volume == 'large' else 'Não necessário inicialmente'}
+• Monitoramento: Métricas customizadas + Alertas proativos
+• Auto-scaling: {'Configurado com thresholds dinâmicos' if scalability in ['high', 'very_high'] else 'Manual com monitoramento'}
+• Particionamento: {'Por tenant/data/região' if data_volume in ['large', 'massive'] else 'Não necessário inicialmente'}
+• Capacity Planning: Previsão baseada em growth metrics
             """,
             'next_steps': """
-1. Prototipar com banco local
-2. Definir schema inicial
-3. Configurar ambiente de desenvolvimento  
-4. Implementar estratégia de migração
-5. Estabelecer métricas de monitoramento
+1. ✅ Prototipar com banco local (Docker Compose)
+2. ✅ Definir schema inicial com versionamento (Liquibase/Flyway)
+3. ✅ Configurar ambiente de dev/test/prod
+4. ✅ Implementar estratégia de migração (blue-green deployment)
+5. ✅ Estabelecer métricas de monitoramento (SLIs/SLOs)
+6. ✅ Documentar procedures de backup/recovery
+7. ✅ Planejar disaster recovery multi-region
             """
         }
